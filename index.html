@@ -112,6 +112,9 @@
     border-radius: 12px; font-size: 1.05rem; font-weight: 700; color: #fff; }
   #keepBtn { background: #3fb950; }
   #discardBtn { background: rgba(255,255,255,.18); }
+  #compareBtn { background: rgba(255,255,255,.18); font-size: .85rem !important; }
+  #reviewCap { color: #b9c3cf; text-align: center; padding: 10px 18px 0; font-size: .88rem;
+    line-height: 1.4; }
 
   /* Intro walkthrough */
   #intro { position: absolute; inset: 0; z-index: 30; background: rgba(0,0,0,.88);
@@ -179,6 +182,8 @@
         <label class="switch"><input type="checkbox" id="setGrid"><span class="slider"></span></label></div>
       <div class="setRow"><span>Review before saving</span>
         <label class="switch"><input type="checkbox" id="setReview"><span class="slider"></span></label></div>
+      <div class="setRow"><span>Level indicator</span>
+        <label class="switch"><input type="checkbox" id="setLevel"><span class="slider"></span></label></div>
       <div class="setRow"><span>Replay tutorial</span>
         <button class="chip" id="replayIntro" style="background:#2a323d">Show</button></div>
     </div>
@@ -186,8 +191,10 @@
 
   <div id="review">
     <img id="reviewImg" alt="Captured photo">
+    <div id="reviewCap"></div>
     <div id="reviewBtns">
       <button id="discardBtn">✕ Discard</button>
+      <button id="compareBtn">👁 Hold: original</button>
       <button id="keepBtn">✓ Keep</button>
     </div>
   </div>
@@ -215,7 +222,7 @@
   const zoomWrap = $('zoomWrap'), zoomSlider = $('zoom'), zoomVal = $('zoomVal');
 
   // ---------- Settings ----------
-  const DEFAULTS = { countdown: 2, cooldown: 4, sound: true, haptics: true, grid: true, review: true };
+  const DEFAULTS = { countdown: 2, cooldown: 4, sound: true, haptics: true, grid: true, review: true, level: true };
   let settings = { ...DEFAULTS };
   try { settings = { ...DEFAULTS, ...JSON.parse(localStorage.getItem('tc-settings') || '{}') }; } catch (e) {}
   const saveSettings = () => { try { localStorage.setItem('tc-settings', JSON.stringify(settings)); } catch (e) {} };
@@ -226,6 +233,8 @@
   $('setHaptics').checked = settings.haptics;
   $('setGrid').checked = settings.grid;
   $('setReview').checked = settings.review;
+  $('setLevel').checked = settings.level;
+  $('setLevel').onchange = e => { settings.level = e.target.checked; saveSettings(); };
   $('setCountdown').onchange = e => { settings.countdown = +e.target.value; saveSettings(); };
   $('setCooldown').onchange = e => { settings.cooldown = +e.target.value; saveSettings(); };
   $('setSound').onchange = e => { settings.sound = e.target.checked; saveSettings(); };
@@ -257,6 +266,34 @@
   const shutterSound = () => { beep(1100, 0.05, 0.2); setTimeout(() => beep(700, 0.07, 0.2), 60); };
   const lockSound = () => beep(880, 0.08, 0.12);
   const buzz = ms => { if (settings.haptics && navigator.vibrate) navigator.vibrate(ms); };
+
+  // ---------- Level (device tilt) ----------
+  let tilt = null;
+  function enableMotion() {
+    const add = () => window.addEventListener('devicemotion', e => {
+      const a = e.accelerationIncludingGravity;
+      if (!a || a.x === null) return;
+      let r = Math.atan2(a.x, -a.y) * 180 / Math.PI;
+      if (r > 90) r -= 180; if (r < -90) r += 180;
+      tilt = r;
+    });
+    try {
+      if (typeof DeviceMotionEvent !== 'undefined' && DeviceMotionEvent.requestPermission)
+        DeviceMotionEvent.requestPermission().then(s => { if (s === 'granted') add(); }).catch(() => {});
+      else add();
+    } catch (e) {}
+  }
+  document.addEventListener('pointerdown', enableMotion, { once: true });
+
+  // Rotating tips shown while searching for a subject
+  const TIPS = [
+    'Tap any object on screen to make it the subject',
+    'Landscape? Put the horizon on a third line, never the middle',
+    'Leave space in front of a moving subject',
+    'Get closer — let the subject fill more of the frame',
+    'Keep the level line green for straight horizons',
+    'For people, the eyes belong on the top third line'
+  ];
 
   // ---------- Tunables ----------
   const ALIGN_RADIUS = 0.07;
@@ -361,28 +398,66 @@
   }
 
   // ---------- Review ----------
-  let pendingPhoto = null, pendingUrl = null;
-  function openReview(photo) {
+  let pendingPhoto = null, pendingUrl = null, pendingOrigUrl = null;
+  // Draw the thirds grid on a display copy (the saved photo stays clean)
+  function withGrid(blob) {
+    return new Promise(res => {
+      const img = new Image();
+      img.onload = () => {
+        const c = document.createElement('canvas');
+        c.width = img.width; c.height = img.height;
+        const g = c.getContext('2d');
+        g.drawImage(img, 0, 0);
+        g.strokeStyle = 'rgba(255,255,255,.55)';
+        g.lineWidth = Math.max(2, img.width / 400);
+        g.setLineDash([12, 12]);
+        [c.width / 3, 2 * c.width / 3].forEach(x => { g.beginPath(); g.moveTo(x, 0); g.lineTo(x, c.height); g.stroke(); });
+        [c.height / 3, 2 * c.height / 3].forEach(y => { g.beginPath(); g.moveTo(0, y); g.lineTo(c.width, y); g.stroke(); });
+        URL.revokeObjectURL(img.src);
+        res(c.toDataURL('image/jpeg', 0.9));
+      };
+      img.src = URL.createObjectURL(blob);
+    });
+  }
+  async function openReview(photo, origBlob, caption) {
     pendingPhoto = photo;
-    pendingUrl = URL.createObjectURL(photo.blob);
+    pendingUrl = await withGrid(photo.blob);
+    pendingOrigUrl = origBlob ? URL.createObjectURL(origBlob) : null;
     $('reviewImg').src = pendingUrl;
+    $('reviewCap').textContent = caption || '';
+    $('compareBtn').style.display = pendingOrigUrl ? 'block' : 'none';
     $('review').classList.add('open');
     reviewing = true;
   }
   async function closeReview(keep) {
     $('review').classList.remove('open');
     reviewing = false;
-    if (pendingUrl) URL.revokeObjectURL(pendingUrl);
+    if (pendingOrigUrl) URL.revokeObjectURL(pendingOrigUrl);
     if (keep && pendingPhoto) {
       try { await dbPut(pendingPhoto); } catch (e) {}
       addToGallery(pendingPhoto);
       buzz(30);
     }
-    pendingPhoto = null; pendingUrl = null;
+    pendingPhoto = null; pendingUrl = null; pendingOrigUrl = null;
     lastCapture = Date.now();
   }
   $('keepBtn').onclick = () => closeReview(true);
   $('discardBtn').onclick = () => closeReview(false);
+  // Hold to flash back to the ORIGINAL uncomposed shot
+  const compareBtn = $('compareBtn');
+  const showOrig = e => { e.preventDefault(); if (pendingOrigUrl) $('reviewImg').src = pendingOrigUrl; };
+  const showComp = () => { if (pendingUrl) $('reviewImg').src = pendingUrl; };
+  compareBtn.addEventListener('pointerdown', showOrig);
+  compareBtn.addEventListener('pointerup', showComp);
+  compareBtn.addEventListener('pointerleave', showComp);
+  // Why-this-works caption
+  function explain(m) {
+    if (!m) return 'Saved as framed — no subject was detected at the moment of capture.';
+    const pos = `${m.fy < 0.5 ? 'top' : 'bottom'}-${m.fx < 0.5 ? 'left' : 'right'}`;
+    let s = `${m.eye ? '👁 Eyes' : 'Subject'} placed on the ${pos} third intersection`;
+    if (Math.abs(m.vx || 0) > 45) s += `, with lead room ${m.vx > 0 ? 'to the right' : 'to the left'} (space in front of movement)`;
+    return s + ' — that\'s the rule of thirds.';
+  }
 
   // ---------- Camera ----------
   function setStatus(t, c) { statusText.textContent = t; statusDot.style.background = c || '#8b949e'; }
@@ -589,6 +664,23 @@
     ctx.restore();
   }
 
+  function drawLevel(w, h) {
+    if (!settings.level || tilt === null) return;
+    const cx = w / 2, cy = h / 2, L = 58;
+    const ok = Math.abs(tilt) <= 2;
+    ctx.save();
+    ctx.translate(cx, cy); ctx.rotate(tilt * Math.PI / 180);
+    ctx.strokeStyle = ok ? '#3fb950' : 'rgba(255,255,255,.85)';
+    ctx.lineWidth = 3; ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.moveTo(-L, 0); ctx.lineTo(-14, 0); ctx.moveTo(14, 0); ctx.lineTo(L, 0); ctx.stroke();
+    ctx.beginPath(); ctx.arc(0, 0, 4, 0, Math.PI * 2); ctx.stroke();
+    ctx.restore();
+    if (!ok) {
+      ctx.fillStyle = 'rgba(255,255,255,.85)'; ctx.font = '12px sans-serif';
+      ctx.fillText(`${tilt.toFixed(0)}°`, cx + L + 10, cy + 4);
+    }
+  }
+
   function doFlash() { flash.style.opacity = '0.9'; setTimeout(() => flash.style.opacity = '0', 120); }
 
   function composeThirds(src, cx, cy, eye, vx) {
@@ -607,29 +699,34 @@
       const x0 = clamp(cx - fx * cw, 0, W - cw);
       const y0 = clamp(cy - fy * ch, 0, H - ch);
       const score = Math.hypot((cx - x0) / cw - fx, (cy - y0) / ch - fy);
-      if (!best || score < best.score) best = { x0, y0, score };
+      if (!best || score < best.score) best = { x0, y0, score, fx, fy };
     }
     const out = document.createElement('canvas');
     out.width = cw; out.height = ch;
     out.getContext('2d').drawImage(src, best.x0, best.y0, cw, ch, 0, 0, cw, ch);
-    return out;
+    return { canvas: out, fx: best.fx, fy: best.fy };
   }
 
   async function capture(label) {
     const v = view || computeView();
     if (!v || reviewing) return;
     const iw = Math.round(v.sw / v.scale), ih = Math.round(v.sh / v.scale);
-    let c = document.createElement('canvas');
-    c.width = iw; c.height = ih;
-    c.getContext('2d').drawImage(video, v.x0, v.y0, iw, ih, 0, 0, iw, ih);
+    const orig = document.createElement('canvas');
+    orig.width = iw; orig.height = ih;
+    orig.getContext('2d').drawImage(video, v.x0, v.y0, iw, ih, 0, 0, iw, ih);
+    let c = orig, meta = null;
     if (lastSubject && Date.now() - lastSubject.t < 1200) {
-      c = composeThirds(c, lastSubject.cxImg, lastSubject.cyImg, lastSubject.eye, lastSubject.vx);
+      const r = composeThirds(orig, lastSubject.cxImg, lastSubject.cyImg, lastSubject.eye, lastSubject.vx);
+      c = r.canvas;
+      meta = { fx: r.fx, fy: r.fy, eye: lastSubject.eye, vx: lastSubject.vx };
     }
     doFlash(); shutterSound(); buzz([40, 60, 40]);
     const blob = await new Promise(r => c.toBlob(r, 'image/jpeg', 0.92));
     const photo = { id: Date.now(), blob, label: label || '' };
-    if (settings.review) openReview(photo);
-    else {
+    if (settings.review) {
+      const origBlob = meta ? await new Promise(r => orig.toBlob(r, 'image/jpeg', 0.92)) : null;
+      openReview(photo, origBlob, explain(meta));
+    } else {
       try { await dbPut(photo); } catch (e) {}
       addToGallery(photo);
       lastCapture = Date.now();
@@ -657,6 +754,7 @@
         const { sw, sh, scale, x0, y0 } = view;
         ctx.clearRect(0, 0, sw, sh);
         drawGrid(sw, sh);
+        drawLevel(sw, sh);
 
         try { lastPreds = await model.detect(video); } catch (e) { lastPreds = []; }
         const res = pickSubject(lastPreds);
@@ -713,7 +811,8 @@
           wasAligned = aligned;
         } else {
           stableCount = 0; wasAligned = false;
-          setStatus(sel ? `Looking for your ${sel.class}…` : 'Looking for a subject… (tap one to choose)');
+          setStatus(sel ? `Looking for your ${sel.class}…`
+                        : '💡 ' + TIPS[Math.floor(performance.now() / 4000) % TIPS.length]);
         }
       }
     }
