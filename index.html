@@ -33,14 +33,13 @@
     display: flex; align-items: center; gap: 8px; z-index: 5; }
   #status { flex: 1; display: flex; align-items: center; gap: 8px;
     background: rgba(0,0,0,.55); backdrop-filter: blur(6px);
-    border-radius: 999px; padding: 7px 12px; color: #fff; font-size: .8rem;
-    min-width: 0; }
+    border-radius: 999px; padding: 7px 12px; color: #fff; font-size: .8rem; min-width: 0; }
   #statusText { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   #statusDot { width: 9px; height: 9px; border-radius: 50%; background: #8b949e; flex-shrink: 0; }
   .chip { background: rgba(0,0,0,.55); backdrop-filter: blur(6px); color: #fff;
     border: none; border-radius: 999px; padding: 7px 11px; font-size: .8rem; }
   #installBtn { display: none; }
-  #lensSel { max-width: 110px; -webkit-appearance: none; appearance: none; }
+  #lensSel { max-width: 105px; -webkit-appearance: none; appearance: none; }
 
   /* Zoom */
   #zoomWrap { position: absolute; right: 10px; top: 50%; transform: translateY(-50%);
@@ -66,17 +65,18 @@
   #galThumb { width: 46px; height: 46px; border-radius: 10px; border: 2px solid rgba(255,255,255,.6);
     background: rgba(255,255,255,.12) center/cover no-repeat; padding: 0; }
 
-  /* Gallery sheet */
-  #sheet { position: absolute; left: 0; right: 0; bottom: 0; top: 22%;
+  /* Sheets (gallery + settings) */
+  .sheet { position: absolute; left: 0; right: 0; bottom: 0; top: 22%;
     background: #14181f; border-radius: 18px 18px 0 0; z-index: 10;
     transform: translateY(105%); transition: transform .25s ease;
     display: flex; flex-direction: column; }
-  #sheet.open { transform: translateY(0); }
-  #sheetHead { display: flex; align-items: center; justify-content: space-between;
+  .sheet.open { transform: translateY(0); }
+  .sheetHead { display: flex; align-items: center; justify-content: space-between;
     padding: 14px 16px; color: #e6edf3; font-weight: 600; }
-  #closeSheet { background: rgba(255,255,255,.15); color: #fff; border: none;
+  .closeBtn { background: rgba(255,255,255,.15); color: #fff; border: none;
     border-radius: 50%; width: 32px; height: 32px; font-size: 1rem; }
-  #gallery { overflow-y: auto; display: grid; gap: 10px; padding: 0 12px calc(16px + env(safe-area-inset-bottom));
+  #gallery { overflow-y: auto; display: grid; gap: 10px;
+    padding: 0 12px calc(16px + env(safe-area-inset-bottom));
     grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); }
   #gallery figure { background: #1d232c; border-radius: 10px; padding: 6px;
     display: flex; flex-direction: column; gap: 6px; }
@@ -84,6 +84,49 @@
   #gallery .row { display: flex; gap: 6px; justify-content: center; }
   #gallery .row button { background: rgba(255,255,255,.12); color: #fff; border: none;
     border-radius: 7px; padding: 6px 10px; font-size: .8rem; }
+
+  /* Settings */
+  #settingsBody { overflow-y: auto; padding: 0 16px calc(20px + env(safe-area-inset-bottom));
+    color: #e6edf3; display: flex; flex-direction: column; gap: 16px; }
+  .setRow { display: flex; align-items: center; justify-content: space-between;
+    background: #1d232c; border-radius: 10px; padding: 13px 14px; font-size: .92rem; }
+  .setRow select { background: #2a323d; color: #fff; border: none; border-radius: 7px;
+    padding: 6px 10px; font-size: .9rem; }
+  .switch { position: relative; width: 48px; height: 28px; }
+  .switch input { opacity: 0; width: 0; height: 0; }
+  .slider { position: absolute; inset: 0; background: #3a424d; border-radius: 999px;
+    transition: .2s; cursor: pointer; }
+  .slider:before { content: ""; position: absolute; width: 22px; height: 22px; left: 3px; top: 3px;
+    background: #fff; border-radius: 50%; transition: .2s; }
+  .switch input:checked + .slider { background: #3fb950; }
+  .switch input:checked + .slider:before { transform: translateX(20px); }
+
+  /* Review overlay */
+  #review { position: absolute; inset: 0; background: #000; z-index: 20;
+    display: none; flex-direction: column; }
+  #review.open { display: flex; }
+  #reviewImg { flex: 1; object-fit: contain; width: 100%; min-height: 0; }
+  #reviewBtns { display: flex; gap: 14px; justify-content: center;
+    padding: 14px 20px calc(20px + env(safe-area-inset-bottom)); }
+  #reviewBtns button { flex: 1; max-width: 220px; padding: 15px; border: none;
+    border-radius: 12px; font-size: 1.05rem; font-weight: 700; color: #fff; }
+  #keepBtn { background: #3fb950; }
+  #discardBtn { background: rgba(255,255,255,.18); }
+
+  /* Intro walkthrough */
+  #intro { position: absolute; inset: 0; z-index: 30; background: rgba(0,0,0,.88);
+    display: none; align-items: center; justify-content: center; padding: 26px; }
+  #intro.open { display: flex; }
+  #introCard { background: #14181f; border-radius: 18px; padding: 28px 22px; max-width: 340px;
+    width: 100%; text-align: center; color: #e6edf3; }
+  #introCard .big { font-size: 3rem; margin-bottom: 12px; }
+  #introCard h2 { font-size: 1.15rem; margin-bottom: 8px; }
+  #introCard p { font-size: .92rem; color: #9aa4b2; line-height: 1.45; min-height: 60px; }
+  #introDots { display: flex; gap: 7px; justify-content: center; margin: 16px 0; }
+  #introDots span { width: 8px; height: 8px; border-radius: 50%; background: #3a424d; }
+  #introDots span.on { background: #2f81f7; }
+  #introNext { width: 100%; padding: 14px; border: none; border-radius: 11px;
+    background: #2f81f7; color: #fff; font-size: 1rem; font-weight: 700; }
 </style>
 </head>
 <body>
@@ -96,6 +139,7 @@
   <div id="topbar">
     <div id="status"><div id="statusDot"></div><div id="statusText">Loading…</div></div>
     <select id="lensSel" class="chip"></select>
+    <button id="settingsBtn" class="chip">⚙</button>
     <button id="installBtn" class="chip">⬇ Install</button>
   </div>
 
@@ -115,9 +159,47 @@
     </div>
   </div>
 
-  <div id="sheet">
-    <div id="sheetHead"><span>Photos</span><button id="closeSheet">✕</button></div>
+  <div id="gallerySheet" class="sheet">
+    <div class="sheetHead"><span>Photos</span><button class="closeBtn" data-close="gallerySheet">✕</button></div>
     <div id="gallery"></div>
+  </div>
+
+  <div id="settingsSheet" class="sheet">
+    <div class="sheetHead"><span>Settings</span><button class="closeBtn" data-close="settingsSheet">✕</button></div>
+    <div id="settingsBody">
+      <div class="setRow"><span>Countdown before snap</span>
+        <select id="setCountdown"><option value="0">Off</option><option value="2">2s</option><option value="3">3s</option><option value="5">5s</option></select></div>
+      <div class="setRow"><span>Pause between shots</span>
+        <select id="setCooldown"><option value="2">2s</option><option value="4">4s</option><option value="6">6s</option><option value="10">10s</option></select></div>
+      <div class="setRow"><span>Shutter sound</span>
+        <label class="switch"><input type="checkbox" id="setSound"><span class="slider"></span></label></div>
+      <div class="setRow"><span>Vibration</span>
+        <label class="switch"><input type="checkbox" id="setHaptics"><span class="slider"></span></label></div>
+      <div class="setRow"><span>Thirds grid</span>
+        <label class="switch"><input type="checkbox" id="setGrid"><span class="slider"></span></label></div>
+      <div class="setRow"><span>Review before saving</span>
+        <label class="switch"><input type="checkbox" id="setReview"><span class="slider"></span></label></div>
+      <div class="setRow"><span>Replay tutorial</span>
+        <button class="chip" id="replayIntro" style="background:#2a323d">Show</button></div>
+    </div>
+  </div>
+
+  <div id="review">
+    <img id="reviewImg" alt="Captured photo">
+    <div id="reviewBtns">
+      <button id="discardBtn">✕ Discard</button>
+      <button id="keepBtn">✓ Keep</button>
+    </div>
+  </div>
+
+  <div id="intro">
+    <div id="introCard">
+      <div class="big" id="introIcon">📷</div>
+      <h2 id="introTitle"></h2>
+      <p id="introText"></p>
+      <div id="introDots"></div>
+      <button id="introNext">Next</button>
+    </div>
   </div>
 </div>
 
@@ -125,27 +207,74 @@
 (async () => {
   const $ = id => document.getElementById(id);
   const video = $('video'), overlay = $('overlay'), ctx = overlay.getContext('2d');
-  const flash = $('flash'), countdownEl = $('countdown');
+  const stage = $('stage'), flash = $('flash'), countdownEl = $('countdown');
   const statusDot = $('statusDot'), statusText = $('statusText');
-  const gallery = $('gallery'), sheet = $('sheet'), galThumb = $('galThumb');
+  const gallery = $('gallery'), galThumb = $('galThumb');
   const autoBtn = $('autoBtn'), shutterBtn = $('shutter'), flipBtn = $('flipBtn');
   const installBtn = $('installBtn'), lensSel = $('lensSel');
   const zoomWrap = $('zoomWrap'), zoomSlider = $('zoom'), zoomVal = $('zoomVal');
 
-  // --- Tunables ---
+  // ---------- Settings ----------
+  const DEFAULTS = { countdown: 2, cooldown: 4, sound: true, haptics: true, grid: true, review: true };
+  let settings = { ...DEFAULTS };
+  try { settings = { ...DEFAULTS, ...JSON.parse(localStorage.getItem('tc-settings') || '{}') }; } catch (e) {}
+  const saveSettings = () => { try { localStorage.setItem('tc-settings', JSON.stringify(settings)); } catch (e) {} };
+
+  $('setCountdown').value = String(settings.countdown);
+  $('setCooldown').value = String(settings.cooldown);
+  $('setSound').checked = settings.sound;
+  $('setHaptics').checked = settings.haptics;
+  $('setGrid').checked = settings.grid;
+  $('setReview').checked = settings.review;
+  $('setCountdown').onchange = e => { settings.countdown = +e.target.value; saveSettings(); };
+  $('setCooldown').onchange = e => { settings.cooldown = +e.target.value; saveSettings(); };
+  $('setSound').onchange = e => { settings.sound = e.target.checked; saveSettings(); };
+  $('setHaptics').onchange = e => { settings.haptics = e.target.checked; saveSettings(); };
+  $('setGrid').onchange = e => { settings.grid = e.target.checked; saveSettings(); };
+  $('setReview').onchange = e => { settings.review = e.target.checked; saveSettings(); };
+
+  document.querySelectorAll('.closeBtn').forEach(b => b.onclick = () => $(b.dataset.close).classList.remove('open'));
+  $('settingsBtn').onclick = () => $('settingsSheet').classList.add('open');
+  galThumb.onclick = () => $('gallerySheet').classList.add('open');
+
+  // ---------- Sound & haptics ----------
+  let audioCtx = null;
+  document.addEventListener('pointerdown', () => {
+    if (!audioCtx) { try { audioCtx = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) {} }
+    if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
+  }, { passive: true });
+  function beep(freq, dur, vol = 0.15) {
+    if (!settings.sound || !audioCtx) return;
+    try {
+      const o = audioCtx.createOscillator(), g = audioCtx.createGain();
+      o.frequency.value = freq; o.type = 'square';
+      g.gain.setValueAtTime(vol, audioCtx.currentTime);
+      g.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + dur);
+      o.connect(g); g.connect(audioCtx.destination);
+      o.start(); o.stop(audioCtx.currentTime + dur);
+    } catch (e) {}
+  }
+  const shutterSound = () => { beep(1100, 0.05, 0.2); setTimeout(() => beep(700, 0.07, 0.2), 60); };
+  const lockSound = () => beep(880, 0.08, 0.12);
+  const buzz = ms => { if (settings.haptics && navigator.vibrate) navigator.vibrate(ms); };
+
+  // ---------- Tunables ----------
   const ALIGN_RADIUS = 0.07;
   const STABLE_FRAMES = 12;
-  const COOLDOWN_MS = 4000;
   const MIN_SCORE = 0.45;
-  const COUNTDOWN_FROM = 2;
 
   let autoCapture = true;
   let facingMode = 'environment';
   let currentDeviceId = null;
   let model = null, stream = null, track = null;
   let stableCount = 0, lastCapture = 0, countingDown = false;
-  let lastSubject = null;   // {cxImg, cyImg, t} in visible-image coords
-  let view = null;          // current mapping {scale, x0, y0, sw, sh}
+  let lastSubject = null;      // {cxImg, cyImg, t}
+  let view = null;
+  let lastPreds = [];
+  let wasAligned = false;
+  let reviewing = false;
+  // Tap-to-select
+  let sel = null;              // {class, bbox, lastSeen}
 
   // ---------- PWA ----------
   if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
@@ -158,6 +287,33 @@
     deferredPrompt.prompt(); await deferredPrompt.userChoice;
     deferredPrompt = null; installBtn.style.display = 'none';
   };
+
+  // ---------- Walkthrough ----------
+  const INTRO = [
+    { icon: '🎯', title: 'Point at your subject', text: 'The AI finds people, pets, and objects automatically — or tap anything on screen to choose it yourself.' },
+    { icon: '🧭', title: 'Follow the arrow', text: 'A glowing arrow guides you to a rule-of-thirds "power point." When you lock on, a ring fills up — hold steady.' },
+    { icon: '📸', title: 'It snaps for you', text: 'The photo is auto-composed on the thirds grid. Review it, keep or discard, and save favorites to your phone.' }
+  ];
+  let introStep = 0;
+  function showIntro() {
+    introStep = 0; renderIntro(); $('intro').classList.add('open');
+  }
+  function renderIntro() {
+    const s = INTRO[introStep];
+    $('introIcon').textContent = s.icon;
+    $('introTitle').textContent = s.title;
+    $('introText').textContent = s.text;
+    $('introDots').innerHTML = INTRO.map((_, i) => `<span class="${i === introStep ? 'on' : ''}"></span>`).join('');
+    $('introNext').textContent = introStep === INTRO.length - 1 ? "Let's go!" : 'Next';
+  }
+  $('introNext').onclick = () => {
+    if (introStep < INTRO.length - 1) { introStep++; renderIntro(); }
+    else { $('intro').classList.remove('open'); try { localStorage.setItem('tc-intro', '1'); } catch (e) {} }
+  };
+  $('replayIntro').onclick = () => { $('settingsSheet').classList.remove('open'); showIntro(); };
+  let introSeen = false;
+  try { introSeen = !!localStorage.getItem('tc-intro'); } catch (e) {}
+  if (!introSeen) showIntro();
 
   // ---------- IndexedDB ----------
   function openDB() {
@@ -186,7 +342,6 @@
     img.src = url;
     const row = document.createElement('div'); row.className = 'row';
     const name = `thirds-${photo.id}.jpg`;
-
     let shareable = false;
     try { shareable = navigator.canShare &&
       navigator.canShare({ files: [new File([photo.blob], name, { type: 'image/jpeg' })] }); } catch (e) {}
@@ -204,8 +359,30 @@
     prepend ? gallery.prepend(fig) : gallery.append(fig);
     if (prepend) galThumb.style.backgroundImage = `url(${url})`;
   }
-  galThumb.onclick = () => sheet.classList.add('open');
-  $('closeSheet').onclick = () => sheet.classList.remove('open');
+
+  // ---------- Review ----------
+  let pendingPhoto = null, pendingUrl = null;
+  function openReview(photo) {
+    pendingPhoto = photo;
+    pendingUrl = URL.createObjectURL(photo.blob);
+    $('reviewImg').src = pendingUrl;
+    $('review').classList.add('open');
+    reviewing = true;
+  }
+  async function closeReview(keep) {
+    $('review').classList.remove('open');
+    reviewing = false;
+    if (pendingUrl) URL.revokeObjectURL(pendingUrl);
+    if (keep && pendingPhoto) {
+      try { await dbPut(pendingPhoto); } catch (e) {}
+      addToGallery(pendingPhoto);
+      buzz(30);
+    }
+    pendingPhoto = null; pendingUrl = null;
+    lastCapture = Date.now();
+  }
+  $('keepBtn').onclick = () => closeReview(true);
+  $('discardBtn').onclick = () => closeReview(false);
 
   // ---------- Camera ----------
   function setStatus(t, c) { statusText.textContent = t; statusDot.style.background = c || '#8b949e'; }
@@ -246,9 +423,7 @@
 
   async function startCamera() {
     if (stream) stream.getTracks().forEach(t => t.stop());
-    const base = currentDeviceId
-      ? { deviceId: { exact: currentDeviceId } }
-      : { facingMode };
+    const base = currentDeviceId ? { deviceId: { exact: currentDeviceId } } : { facingMode };
     try {
       stream = await navigator.mediaDevices.getUserMedia({
         video: { ...base, width: { ideal: 1920 }, height: { ideal: 1920 } }, audio: false
@@ -258,8 +433,7 @@
       video.srcObject = stream;
       await new Promise(r => video.onloadedmetadata = r);
       await video.play().catch(() => {});
-      setupZoom();
-      listLenses();
+      setupZoom(); listLenses();
     } catch (e) {
       setStatus('Camera unavailable: ' + e.message, '#f85149');
       throw e;
@@ -267,11 +441,10 @@
   }
   flipBtn.onclick = async () => {
     facingMode = facingMode === 'environment' ? 'user' : 'environment';
-    currentDeviceId = null;
+    currentDeviceId = null; sel = null;
     await startCamera();
   };
 
-  // Map video pixels → displayed (cover) canvas pixels
   function computeView() {
     const sw = stage.clientWidth, sh = stage.clientHeight;
     const vw = video.videoWidth, vh = video.videoHeight;
@@ -284,39 +457,110 @@
     const scale = Math.max(sw / vw, sh / vh);
     return { sw, sh, scale, x0: (vw - sw / scale) / 2, y0: (vh - sh / scale) / 2 };
   }
-  const stage = $('stage');
 
-  function powerPoints(w, h) {
-    return [
-      { x: w / 3, y: h / 3 }, { x: 2 * w / 3, y: h / 3 },
-      { x: w / 3, y: 2 * h / 3 }, { x: 2 * w / 3, y: 2 * h / 3 }
-    ];
+  // ---------- Tap to choose subject ----------
+  function iou(a, b) {
+    const ax2 = a[0] + a[2], ay2 = a[1] + a[3], bx2 = b[0] + b[2], by2 = b[1] + b[3];
+    const ix = Math.max(0, Math.min(ax2, bx2) - Math.max(a[0], b[0]));
+    const iy = Math.max(0, Math.min(ay2, by2) - Math.max(a[1], b[1]));
+    const inter = ix * iy;
+    return inter / (a[2] * a[3] + b[2] * b[3] - inter || 1);
   }
-
-  function drawGrid(w, h) {
-    ctx.strokeStyle = 'rgba(255,255,255,0.45)'; ctx.lineWidth = 1.5; ctx.setLineDash([8, 8]);
-    [w / 3, 2 * w / 3].forEach(x => { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, h); ctx.stroke(); });
-    [h / 3, 2 * h / 3].forEach(y => { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(w, y); ctx.stroke(); });
-    ctx.setLineDash([]);
-    powerPoints(w, h).forEach(p => {
-      ctx.beginPath(); ctx.arc(p.x, p.y, 10, 0, Math.PI * 2);
-      ctx.strokeStyle = 'rgba(255,255,255,0.7)'; ctx.lineWidth = 2; ctx.stroke();
-    });
-  }
+  video.addEventListener('click', e => {
+    if (!view || !lastPreds.length) { sel = null; return; }
+    const r = video.getBoundingClientRect();
+    const vx = (e.clientX - r.left) / view.scale + view.x0;
+    const vy = (e.clientY - r.top) / view.scale + view.y0;
+    let hit = null;
+    for (const p of lastPreds) {
+      const [x, y, w, h] = p.bbox;
+      if (vx >= x && vx <= x + w && vy >= y && vy <= y + h) {
+        if (!hit || w * h < hit.bbox[2] * hit.bbox[3]) hit = p;   // smallest box wins
+      }
+    }
+    if (hit) {
+      sel = { class: hit.class, bbox: hit.bbox, lastSeen: Date.now() };
+      buzz(20); lockSound();
+      setStatus(`Tracking ${hit.class} — tap elsewhere to switch`, '#a371f7');
+    } else sel = null;   // tapped empty space → back to auto
+  });
 
   function pickSubject(preds) {
+    // selected subject first
+    if (sel) {
+      let best = null, bi = 0;
+      for (const p of preds) {
+        if (p.class !== sel.class || p.score < 0.3) continue;
+        const v = iou(p.bbox, sel.bbox);
+        if (v > bi) { bi = v; best = p; }
+      }
+      if (best && bi > 0.1) { sel.bbox = best.bbox; sel.lastSeen = Date.now(); return { pred: best, selected: true }; }
+      if (Date.now() - sel.lastSeen > 2500) sel = null;   // lost too long → auto
+      else return null;                                    // briefly lost — wait
+    }
     let best = null, bv = 0;
     for (const p of preds) {
       if (p.score < MIN_SCORE) continue;
       const v = p.bbox[2] * p.bbox[3] * p.score;
       if (v > bv) { bv = v; best = p; }
     }
-    return best;
+    return best ? { pred: best, selected: false } : null;
+  }
+
+  // ---------- Drawing ----------
+  function powerPoints(w, h) {
+    return [
+      { x: w / 3, y: h / 3 }, { x: 2 * w / 3, y: h / 3 },
+      { x: w / 3, y: 2 * h / 3 }, { x: 2 * w / 3, y: 2 * h / 3 }
+    ];
+  }
+  function drawGrid(w, h) {
+    if (settings.grid) {
+      ctx.strokeStyle = 'rgba(255,255,255,0.4)'; ctx.lineWidth = 1.5; ctx.setLineDash([8, 8]);
+      [w / 3, 2 * w / 3].forEach(x => { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, h); ctx.stroke(); });
+      [h / 3, 2 * h / 3].forEach(y => { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(w, y); ctx.stroke(); });
+      ctx.setLineDash([]);
+    }
+    powerPoints(w, h).forEach(p => {
+      ctx.beginPath(); ctx.arc(p.x, p.y, 10, 0, Math.PI * 2);
+      ctx.strokeStyle = 'rgba(255,255,255,0.7)'; ctx.lineWidth = 2; ctx.stroke();
+    });
+  }
+  // Big pulsing arrow from subject toward target
+  function drawArrow(cx, cy, tx, ty) {
+    const dx = tx - cx, dy = ty - cy;
+    const dist = Math.hypot(dx, dy);
+    if (dist < 30) return;
+    const ux = dx / dist, uy = dy / dist;
+    const pulse = 0.55 + 0.45 * Math.sin(performance.now() / 180);
+    const startD = 26, endD = Math.min(dist - 22, 26 + 46 * pulse);
+    const sx = cx + ux * startD, sy = cy + uy * startD;
+    const ex = cx + ux * endD, ey = cy + uy * endD;
+    ctx.save();
+    ctx.globalAlpha = 0.9;
+    ctx.strokeStyle = '#ffd33d'; ctx.fillStyle = '#ffd33d';
+    ctx.lineWidth = 7; ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.moveTo(sx, sy); ctx.lineTo(ex, ey); ctx.stroke();
+    const ah = 16, ang = Math.atan2(uy, ux);
+    ctx.beginPath();
+    ctx.moveTo(ex + Math.cos(ang) * ah, ey + Math.sin(ang) * ah);
+    ctx.lineTo(ex + Math.cos(ang + 2.5) * ah, ey + Math.sin(ang + 2.5) * ah);
+    ctx.lineTo(ex + Math.cos(ang - 2.5) * ah, ey + Math.sin(ang - 2.5) * ah);
+    ctx.closePath(); ctx.fill();
+    ctx.restore();
+  }
+  function drawProgressRing(x, y, frac) {
+    ctx.save();
+    ctx.strokeStyle = 'rgba(255,255,255,.35)'; ctx.lineWidth = 5;
+    ctx.beginPath(); ctx.arc(x, y, 22, 0, Math.PI * 2); ctx.stroke();
+    ctx.strokeStyle = '#3fb950';
+    ctx.beginPath(); ctx.arc(x, y, 22, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * Math.min(frac, 1));
+    ctx.stroke();
+    ctx.restore();
   }
 
   function doFlash() { flash.style.opacity = '0.9'; setTimeout(() => flash.style.opacity = '0', 120); }
 
-  // Crop so the subject lands EXACTLY on a thirds power point
   function composeThirds(src, cx, cy) {
     const W = src.width, H = src.height, z = 1.25;
     const cw = Math.round(W / z), ch = Math.round(H / z);
@@ -336,8 +580,7 @@
 
   async function capture(label) {
     const v = view || computeView();
-    if (!v) return;
-    // WYSIWYG: capture exactly what's visible on screen
+    if (!v || reviewing) return;
     const iw = Math.round(v.sw / v.scale), ih = Math.round(v.sh / v.scale);
     let c = document.createElement('canvas');
     c.width = iw; c.height = ih;
@@ -345,19 +588,23 @@
     if (lastSubject && Date.now() - lastSubject.t < 1200) {
       c = composeThirds(c, lastSubject.cxImg, lastSubject.cyImg);
     }
-    doFlash();
+    doFlash(); shutterSound(); buzz([40, 60, 40]);
     const blob = await new Promise(r => c.toBlob(r, 'image/jpeg', 0.92));
     const photo = { id: Date.now(), blob, label: label || '' };
-    try { await dbPut(photo); } catch (e) {}
-    addToGallery(photo);
-    lastCapture = Date.now();
+    if (settings.review) openReview(photo);
+    else {
+      try { await dbPut(photo); } catch (e) {}
+      addToGallery(photo);
+      lastCapture = Date.now();
+    }
     stableCount = 0;
   }
 
   async function runCountdownAndCapture(label) {
     countingDown = true;
-    for (let n = COUNTDOWN_FROM; n >= 1; n--) {
+    for (let n = settings.countdown; n >= 1; n--) {
       countdownEl.textContent = n; countdownEl.style.opacity = '1';
+      beep(600, 0.06, 0.1);
       await new Promise(r => setTimeout(r, 500));
     }
     countdownEl.style.opacity = '0';
@@ -365,28 +612,21 @@
     countingDown = false;
   }
 
-  function guidance(dx, dy) {
-    const d = [];
-    if (Math.abs(dx) > 4) d.push(dx > 0 ? '→' : '←');
-    if (Math.abs(dy) > 4) d.push(dy > 0 ? '↓' : '↑');
-    return d.length ? 'Move ' + d.join(' ') : 'Hold still…';
-  }
-
+  // ---------- Main loop ----------
   async function loop() {
-    if (video.readyState >= 2 && model && video.videoWidth) {
+    if (video.readyState >= 2 && model && video.videoWidth && !reviewing) {
       view = computeView();
       if (view) {
         const { sw, sh, scale, x0, y0 } = view;
         ctx.clearRect(0, 0, sw, sh);
         drawGrid(sw, sh);
 
-        let preds = [];
-        try { preds = await model.detect(video); } catch (e) {}
-        const subject = pickSubject(preds);
+        try { lastPreds = await model.detect(video); } catch (e) { lastPreds = []; }
+        const res = pickSubject(lastPreds);
 
-        if (subject) {
+        if (res) {
+          const { pred: subject, selected } = res;
           const [vbx, vby, vbw, vbh] = subject.bbox;
-          // map to screen coords
           const bx = (vbx - x0) * scale, by = (vby - y0) * scale;
           const bw = vbw * scale, bh = vbh * scale;
           const cx = bx + bw / 2, cy = by + bh / 2;
@@ -397,41 +637,43 @@
           for (const p of pts) { const d = Math.hypot(cx - p.x, cy - p.y); if (d < nd) { nd = d; nearest = p; } }
           const aligned = nd <= ALIGN_RADIUS * Math.hypot(sw, sh);
 
-          ctx.strokeStyle = aligned ? '#3fb950' : '#2f81f7'; ctx.lineWidth = 3;
+          const boxColor = aligned ? '#3fb950' : (selected ? '#a371f7' : '#2f81f7');
+          ctx.strokeStyle = boxColor; ctx.lineWidth = 3;
           ctx.strokeRect(bx, by, bw, bh);
-          ctx.fillStyle = ctx.strokeStyle;
+          ctx.fillStyle = boxColor;
           ctx.beginPath(); ctx.arc(cx, cy, 6, 0, Math.PI * 2); ctx.fill();
-          ctx.font = '15px sans-serif';
-          ctx.fillText(`${subject.class} ${(subject.score * 100).toFixed(0)}%`, bx + 4, Math.max(60, by - 8));
+          ctx.font = 'bold 15px sans-serif';
+          const tag = (selected ? '📌 ' : '') + subject.class;
+          ctx.fillText(tag, bx + 4, Math.max(64, by - 8));
 
-          ctx.setLineDash([4, 6]);
-          ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(nearest.x, nearest.y); ctx.stroke();
-          ctx.setLineDash([]);
-          ctx.beginPath(); ctx.arc(nearest.x, nearest.y, 14, 0, Math.PI * 2);
-          ctx.strokeStyle = aligned ? '#3fb950' : '#d29922'; ctx.lineWidth = 3; ctx.stroke();
-
-          const cooling = Date.now() - lastCapture < COOLDOWN_MS;
           if (aligned) {
+            if (!wasAligned) { lockSound(); buzz(15); }
             stableCount++;
-            if (cooling) setStatus(`${subject.class} aligned — cooling down`, '#d29922');
+            drawProgressRing(nearest.x, nearest.y, stableCount / STABLE_FRAMES);
+            const cooling = Date.now() - lastCapture < settings.cooldown * 1000;
+            if (cooling) setStatus(`Nice! Pausing between shots…`, '#d29922');
             else if (autoCapture && !countingDown && stableCount >= STABLE_FRAMES) {
               setStatus(`Capturing ${subject.class}!`, '#3fb950');
               runCountdownAndCapture(subject.class);
-            } else setStatus(`${subject.class} — hold still (${Math.min(stableCount, STABLE_FRAMES)}/${STABLE_FRAMES})`, '#3fb950');
+            } else setStatus(`Locked on ${subject.class} — hold steady`, '#3fb950');
           } else {
             stableCount = 0;
-            setStatus(`${subject.class} — ${guidance(nearest.x - cx, nearest.y - cy)}`, '#2f81f7');
+            drawArrow(cx, cy, nearest.x, nearest.y);
+            ctx.beginPath(); ctx.arc(nearest.x, nearest.y, 14, 0, Math.PI * 2);
+            ctx.strokeStyle = '#ffd33d'; ctx.lineWidth = 3; ctx.stroke();
+            setStatus(`${selected ? 'Tracking' : 'Found'} ${subject.class} — follow the arrow`, selected ? '#a371f7' : '#2f81f7');
           }
+          wasAligned = aligned;
         } else {
-          stableCount = 0;
-          setStatus('Looking for a subject…');
+          stableCount = 0; wasAligned = false;
+          setStatus(sel ? `Looking for your ${sel.class}…` : 'Looking for a subject… (tap one to choose)');
         }
       }
     }
     requestAnimationFrame(loop);
   }
 
-  // --- Controls ---
+  // ---------- Controls ----------
   autoBtn.onclick = () => {
     autoCapture = !autoCapture;
     autoBtn.textContent = autoCapture ? 'AUTO ON' : 'AUTO OFF';
@@ -439,9 +681,12 @@
   };
   shutterBtn.onclick = () => capture('manual');
 
-  // --- Boot ---
-  try { (await dbAll()).forEach(p => addToGallery(p, false));
-        const first = gallery.querySelector('img'); if (first) galThumb.style.backgroundImage = `url(${first.src})`; } catch (e) {}
+  // ---------- Boot ----------
+  try {
+    (await dbAll()).forEach(p => addToGallery(p, false));
+    const first = gallery.querySelector('img');
+    if (first) galThumb.style.backgroundImage = `url(${first.src})`;
+  } catch (e) {}
   try {
     setStatus('Requesting camera…');
     await startCamera();
