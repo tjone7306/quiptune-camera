@@ -16,6 +16,7 @@
 <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/blazeface@0.1.0/dist/blazeface.min.umd.js"></script>
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+  button, input, select { touch-action: manipulation; }
   html, body { height: 100%; overflow: hidden; background: #000;
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
 
@@ -118,7 +119,7 @@
     line-height: 1.4; }
 
   /* Intro walkthrough */
-  #intro { position: absolute; inset: 0; z-index: 30; background: rgba(0,0,0,.88);
+  #intro { position: fixed; inset: 0; z-index: 999; background: rgba(0,0,0,.88);
     display: none; align-items: center; justify-content: center; padding: 26px; }
   #intro.open { display: flex; }
   #introCard { background: #14181f; border-radius: 18px; padding: 28px 22px; max-width: 340px;
@@ -131,6 +132,8 @@
   #introDots span.on { background: #2f81f7; }
   #introNext { width: 100%; padding: 14px; border: none; border-radius: 11px;
     background: #2f81f7; color: #fff; font-size: 1rem; font-weight: 700; }
+  #introSkip { width: 100%; margin-top: 12px; padding: 8px; background: none; border: none;
+    color: #8b949e; font-size: .9rem; }
 </style>
 </head>
 <body>
@@ -208,6 +211,7 @@
       <p id="introText"></p>
       <div id="introDots"></div>
       <button id="introNext">Next</button>
+      <button id="introSkip">Skip tutorial</button>
     </div>
   </div>
 </div>
@@ -376,13 +380,27 @@
     $('introDots').innerHTML = INTRO.map((_, i) => `<span class="${i === introStep ? 'on' : ''}"></span>`).join('');
     $('introNext').textContent = introStep === INTRO.length - 1 ? "Let's go!" : 'Next';
   }
-  $('introNext').onclick = () => {
+  function closeIntro() {
+    $('intro').classList.remove('open');
+    try { localStorage.setItem('tc-intro', '1'); } catch (e) {}
+    try { document.cookie = 'tc_intro=1;max-age=31536000;path=/'; } catch (e) {}
+  }
+  let lastAdvance = 0;
+  function advanceIntro() {
+    const now = Date.now();
+    if (now - lastAdvance < 350) return;      // guard against double-fired events
+    lastAdvance = now;
     if (introStep < INTRO.length - 1) { introStep++; renderIntro(); }
-    else { $('intro').classList.remove('open'); try { localStorage.setItem('tc-intro', '1'); } catch (e) {} }
-  };
+    else closeIntro();
+  }
+  const introNextBtn = $('introNext'), introSkipBtn = $('introSkip');
+  introNextBtn.addEventListener('click', advanceIntro);
+  introNextBtn.addEventListener('touchend', e => { e.preventDefault(); advanceIntro(); }, { passive: false });
+  introSkipBtn.addEventListener('click', closeIntro);
+  introSkipBtn.addEventListener('touchend', e => { e.preventDefault(); closeIntro(); }, { passive: false });
   $('replayIntro').onclick = () => { $('settingsSheet').classList.remove('open'); showIntro(); };
   let introSeen = false;
-  try { introSeen = !!localStorage.getItem('tc-intro'); } catch (e) {}
+  try { introSeen = !!localStorage.getItem('tc-intro') || document.cookie.indexOf('tc_intro=1') !== -1; } catch (e) {}
   if (!introSeen) showIntro();
 
   // ---------- IndexedDB ----------
