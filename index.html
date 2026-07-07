@@ -13,6 +13,7 @@
 <meta name="apple-mobile-web-app-title" content="Thirds Cam">
 <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.17.0/dist/tf.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/coco-ssd@2.2.3/dist/coco-ssd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/blazeface@0.1.0/dist/blazeface.min.umd.js"></script>
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
   html, body { height: 100%; overflow: hidden; background: #000;
@@ -141,6 +142,7 @@
 
   <div id="topbar">
     <div id="status"><div id="statusDot"></div><div id="statusText">Loading…</div></div>
+    <button id="modeBtn" class="chip">⅓</button>
     <select id="lensSel" class="chip"></select>
     <button id="settingsBtn" class="chip">⚙</button>
     <button id="installBtn" class="chip">⬇ Install</button>
@@ -163,7 +165,7 @@
   </div>
 
   <div id="gallerySheet" class="sheet">
-    <div class="sheetHead"><span>Photos</span><button class="closeBtn" data-close="gallerySheet">✕</button></div>
+    <div class="sheetHead"><span>Photos <small id="galStats" style="color:#8b949e;font-weight:400"></small></span><button class="closeBtn" data-close="gallerySheet">✕</button></div>
     <div id="gallery"></div>
   </div>
 
@@ -222,7 +224,7 @@
   const zoomWrap = $('zoomWrap'), zoomSlider = $('zoom'), zoomVal = $('zoomVal');
 
   // ---------- Settings ----------
-  const DEFAULTS = { countdown: 2, cooldown: 4, sound: true, haptics: true, grid: true, review: true, level: true };
+  const DEFAULTS = { countdown: 2, cooldown: 4, sound: true, haptics: true, grid: true, review: true, level: true, mode: 'thirds' };
   let settings = { ...DEFAULTS };
   try { settings = { ...DEFAULTS, ...JSON.parse(localStorage.getItem('tc-settings') || '{}') }; } catch (e) {}
   const saveSettings = () => { try { localStorage.setItem('tc-settings', JSON.stringify(settings)); } catch (e) {} };
@@ -235,6 +237,20 @@
   $('setReview').checked = settings.review;
   $('setLevel').checked = settings.level;
   $('setLevel').onchange = e => { settings.level = e.target.checked; saveSettings(); };
+
+  // Composition mode switcher (thirds / golden ratio / center-symmetry)
+  const MODES = [['thirds', '⅓ Thirds'], ['golden', 'φ Golden'], ['center', '◎ Center']];
+  function renderMode() {
+    const m = MODES.find(m => m[0] === settings.mode) || MODES[0];
+    $('modeBtn').textContent = m[1];
+  }
+  $('modeBtn').onclick = () => {
+    const i = MODES.findIndex(m => m[0] === settings.mode);
+    settings.mode = MODES[(i + 1) % MODES.length][0];
+    saveSettings(); renderMode();
+  };
+  renderMode();
+  function ratios() { return settings.mode === 'golden' ? [0.382, 0.618] : [1/3, 2/3]; }
   $('setCountdown').onchange = e => { settings.countdown = +e.target.value; saveSettings(); };
   $('setCooldown').onchange = e => { settings.cooldown = +e.target.value; saveSettings(); };
   $('setSound').onchange = e => { settings.sound = e.target.checked; saveSettings(); };
@@ -244,7 +260,23 @@
 
   document.querySelectorAll('.closeBtn').forEach(b => b.onclick = () => $(b.dataset.close).classList.remove('open'));
   $('settingsBtn').onclick = () => $('settingsSheet').classList.add('open');
-  galThumb.onclick = () => $('gallerySheet').classList.add('open');
+  galThumb.onclick = () => { $('gallerySheet').classList.add('open'); updateStats(); };
+  // Progress tracking: average composition score, early vs recent
+  async function updateStats() {
+    try {
+      const all = (await dbAll()).filter(p => p.score);       // newest first
+      if (!all.length) { $('galStats').textContent = ''; return; }
+      const avg = a => a.reduce((s, p) => s + p.score, 0) / a.length;
+      let txt = `· avg score ${avg(all).toFixed(0)}/100`;
+      if (all.length >= 6) {
+        const recent = avg(all.slice(0, Math.ceil(all.length / 2)));
+        const early = avg(all.slice(Math.ceil(all.length / 2)));
+        const d = recent - early;
+        if (Math.abs(d) >= 1) txt += ` (${d > 0 ? '📈 +' : '📉 '}${d.toFixed(0)} vs earlier)`;
+      }
+      $('galStats').textContent = txt;
+    } catch (e) {}
+  }
 
   // ---------- Sound & haptics ----------
   let audioCtx = null;
@@ -303,7 +335,8 @@
   let autoCapture = true;
   let facingMode = 'environment';
   let currentDeviceId = null;
-  let model = null, stream = null, track = null;
+  let model = null, faceModel = null, stream = null, track = null;
+  let faceInfo = null, lastFaceRun = 0, lastAlign = null;
   let stableCount = 0, lastCapture = 0, countingDown = false;
   let lastSubject = null;      // {cxImg, cyImg, t}
   let view = null;
@@ -453,10 +486,13 @@
   // Why-this-works caption
   function explain(m) {
     if (!m) return 'Saved as framed — no subject was detected at the moment of capture.';
+    if (settings.mode === 'center')
+      return `${m.eye ? '👁 Eyes' : 'Subject'} centered for a symmetrical composition.`;
+    const ruleName = settings.mode === 'golden' ? 'golden-ratio point' : 'third intersection';
     const pos = `${m.fy < 0.5 ? 'top' : 'bottom'}-${m.fx < 0.5 ? 'left' : 'right'}`;
-    let s = `${m.eye ? '👁 Eyes' : 'Subject'} placed on the ${pos} third intersection`;
-    if (Math.abs(m.vx || 0) > 45) s += `, with lead room ${m.vx > 0 ? 'to the right' : 'to the left'} (space in front of movement)`;
-    return s + ' — that\'s the rule of thirds.';
+    let s = `${m.eye ? '👁 Eyes' : 'Subject'} placed on the ${pos} ${ruleName}`;
+    if (Math.abs(m.vx || 0) > 45) s += `, with lead room ${m.vx > 0 ? 'to the right' : 'to the left'} (space in front)`;
+    return s + (settings.mode === 'golden' ? ' — the golden ratio at work.' : ' — that\'s the rule of thirds.');
   }
 
   // ---------- Camera ----------
@@ -603,9 +639,11 @@
   // Which intersections are valid targets for this subject
   function candidatePoints(w, h, eye, vx) {
     let pts = powerPoints(w, h);
-    if (eye) pts = pts.filter(p => p.y < h / 2);       // eyes belong on the TOP third line
-    if (Math.abs(vx) > 45) {                           // moving → leave lead room in front
-      const wantX = vx > 0 ? w / 3 : 2 * w / 3;        // moving right → subject left, space right
+    if (settings.mode === 'center') return pts;        // symmetry mode: dead center
+    if (eye) pts = pts.filter(p => p.y < h / 2);       // eyes belong on the TOP line
+    if (Math.abs(vx) > 45) {                           // moving/looking → leave lead room in front
+      const [a, b] = ratios();
+      const wantX = vx > 0 ? w * a : w * b;            // heading right → subject left, space right
       const f = pts.filter(p => Math.abs(p.x - wantX) < 1);
       if (f.length) pts = f;
     }
@@ -614,16 +652,20 @@
 
   // ---------- Drawing ----------
   function powerPoints(w, h) {
+    if (settings.mode === 'center') return [{ x: w / 2, y: h / 2 }];
+    const [a, b] = ratios();
     return [
-      { x: w / 3, y: h / 3 }, { x: 2 * w / 3, y: h / 3 },
-      { x: w / 3, y: 2 * h / 3 }, { x: 2 * w / 3, y: 2 * h / 3 }
+      { x: w * a, y: h * a }, { x: w * b, y: h * a },
+      { x: w * a, y: h * b }, { x: w * b, y: h * b }
     ];
   }
   function drawGrid(w, h) {
     if (settings.grid) {
       ctx.strokeStyle = 'rgba(255,255,255,0.4)'; ctx.lineWidth = 1.5; ctx.setLineDash([8, 8]);
-      [w / 3, 2 * w / 3].forEach(x => { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, h); ctx.stroke(); });
-      [h / 3, 2 * h / 3].forEach(y => { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(w, y); ctx.stroke(); });
+      const xs = settings.mode === 'center' ? [w / 2] : ratios().map(r => w * r);
+      const ys = settings.mode === 'center' ? [h / 2] : ratios().map(r => h * r);
+      xs.forEach(x => { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, h); ctx.stroke(); });
+      ys.forEach(y => { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(w, y); ctx.stroke(); });
       ctx.setLineDash([]);
     }
     powerPoints(w, h).forEach(p => {
@@ -687,12 +729,17 @@
     const W = src.width, H = src.height, z = 1.25;
     const cw = Math.round(W / z), ch = Math.round(H / z);
     const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
-    let cands = [[1/3, 1/3], [2/3, 1/3], [1/3, 2/3], [2/3, 2/3]];
-    if (eye) cands = cands.filter(c => c[1] < 0.5);          // eyes on top intersections
-    if (Math.abs(vx || 0) > 45) {                            // lead room in front of motion
-      const wantFx = vx > 0 ? 1/3 : 2/3;
-      const f = cands.filter(c => c[0] === wantFx);
-      if (f.length) cands = f;
+    let cands;
+    if (settings.mode === 'center') cands = [[0.5, 0.5]];
+    else {
+      const [a, b] = ratios();
+      cands = [[a, a], [b, a], [a, b], [b, b]];
+      if (eye) cands = cands.filter(c => c[1] < 0.5);        // eyes on top points
+      if (Math.abs(vx || 0) > 45) {                          // lead room in front
+        const wantFx = vx > 0 ? a : b;
+        const f = cands.filter(c => c[0] === wantFx);
+        if (f.length) cands = f;
+      }
     }
     let best = null;
     for (const [fx, fy] of cands) {
@@ -721,11 +768,20 @@
       meta = { fx: r.fx, fy: r.fy, eye: lastSubject.eye, vx: lastSubject.vx };
     }
     doFlash(); shutterSound(); buzz([40, 60, 40]);
+    // Composition score: how well framed at the moment of capture + how level
+    let score = null;
+    if (meta) {
+      let s = 100;
+      if (lastAlign) s -= Math.min(35, (lastAlign.nd / lastAlign.th) * 15);
+      if (tilt !== null) s -= Math.min(20, Math.abs(tilt) * 2);
+      score = Math.max(40, Math.round(s));
+      meta.score = score;
+    }
     const blob = await new Promise(r => c.toBlob(r, 'image/jpeg', 0.92));
-    const photo = { id: Date.now(), blob, label: label || '' };
+    const photo = { id: Date.now(), blob, label: label || '', score };
     if (settings.review) {
       const origBlob = meta ? await new Promise(r => orig.toBlob(r, 'image/jpeg', 0.92)) : null;
-      openReview(photo, origBlob, explain(meta));
+      openReview(photo, origBlob, explain(meta) + (score ? ` · Score ${score}/100` : ''));
     } else {
       try { await dbPut(photo); } catch (e) {}
       addToGallery(photo);
@@ -767,14 +823,41 @@
           const cx = bx + bw / 2, cy = by + bh / 2;
           // Anchor: eyes for people/animals, center for objects
           const anc = anchorFor(subject);
+          // Real eye position + gaze from face detection (runs every 400ms)
+          if (faceModel && subject.class === 'person' && performance.now() - lastFaceRun > 400) {
+            lastFaceRun = performance.now();
+            faceModel.estimateFaces(video, false).then(fs => {
+              faceInfo = null;
+              for (const f of fs) {
+                const fcx = (f.topLeft[0] + f.bottomRight[0]) / 2;
+                const fcy = (f.topLeft[1] + f.bottomRight[1]) / 2;
+                const re = f.landmarks[0], le = f.landmarks[1], nose = f.landmarks[2];
+                const eyeMidX = (re[0] + le[0]) / 2;
+                const eyeSpan = Math.abs(re[0] - le[0]) || 1;
+                const off = (nose[0] - eyeMidX) / eyeSpan;   // >0: facing right
+                faceInfo = { eyeX: eyeMidX, eyeY: (re[1] + le[1]) / 2,
+                             gaze: Math.abs(off) > 0.25 ? Math.sign(off) : 0,
+                             cx: fcx, cy: fcy, t: performance.now() };
+                break;
+              }
+            }).catch(() => {});
+          }
+          const faceFresh = faceInfo && performance.now() - faceInfo.t < 1000 &&
+            faceInfo.cx > vbx && faceInfo.cx < vbx + vbw && faceInfo.cy > vby && faceInfo.cy < vby + vbh;
+          if (faceFresh) { anc.x = faceInfo.eyeX; anc.y = faceInfo.eyeY; anc.eye = true; }
+
           const ax = (anc.x - x0) * scale, ay = (anc.y - y0) * scale;
           const vxMotion = trackMotion(ax);
-          lastSubject = { cxImg: anc.x - x0, cyImg: anc.y - y0, eye: anc.eye, vx: vxMotion, t: Date.now() };
+          // Lead room: movement wins; otherwise use gaze direction
+          let effVx = vxMotion;
+          if (Math.abs(effVx) < 45 && faceFresh && faceInfo.gaze) effVx = faceInfo.gaze * 60;
+          lastSubject = { cxImg: anc.x - x0, cyImg: anc.y - y0, eye: anc.eye, vx: effVx, t: Date.now() };
 
-          const pts = candidatePoints(sw, sh, anc.eye, vxMotion);
+          const pts = candidatePoints(sw, sh, anc.eye, effVx);
           let nearest = pts[0], nd = Infinity;
           for (const p of pts) { const d = Math.hypot(ax - p.x, ay - p.y); if (d < nd) { nd = d; nearest = p; } }
-          const aligned = nd <= ALIGN_RADIUS * Math.hypot(sw, sh);
+          lastAlign = { nd, th: ALIGN_RADIUS * Math.hypot(sw, sh) };
+          const aligned = nd <= lastAlign.th;
 
           const boxColor = aligned ? '#3fb950' : (selected ? '#a371f7' : '#2f81f7');
           ctx.strokeStyle = boxColor; ctx.lineWidth = 3;
@@ -838,6 +921,7 @@
     await startCamera();
     setStatus('Loading AI model…');
     model = await cocoSsd.load();
+    if (window.blazeface) blazeface.load().then(m => faceModel = m).catch(() => {});
     setStatus('Ready — point at a subject', '#3fb950');
     loop();
   } catch (e) { console.error(e); }
