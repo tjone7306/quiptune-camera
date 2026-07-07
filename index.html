@@ -507,6 +507,36 @@
     return best ? { pred: best, selected: false } : null;
   }
 
+  // ---------- Pro composition rules ----------
+  // For people/animals the EYES go on an intersection (top third), not the body center
+  const EYE_CLASSES = new Set(['person', 'cat', 'dog', 'bird', 'horse', 'sheep', 'cow', 'elephant', 'bear', 'zebra', 'giraffe']);
+  function anchorFor(pred) {           // in video coords
+    const [x, y, w, h] = pred.bbox;
+    if (EYE_CLASSES.has(pred.class)) return { x: x + w / 2, y: y + h * 0.12, eye: true };
+    return { x: x + w / 2, y: y + h / 2, eye: false };
+  }
+  // Motion tracking for lead room (space in front of a moving subject)
+  let motionHist = [];
+  function trackMotion(x) {
+    const now = performance.now();
+    motionHist.push({ x, t: now });
+    motionHist = motionHist.filter(m => now - m.t < 800);
+    if (motionHist.length < 4) return 0;
+    const a = motionHist[0], b = motionHist[motionHist.length - 1];
+    return (b.x - a.x) / ((b.t - a.t) / 1000 || 1);   // px/sec, + = moving right
+  }
+  // Which intersections are valid targets for this subject
+  function candidatePoints(w, h, eye, vx) {
+    let pts = powerPoints(w, h);
+    if (eye) pts = pts.filter(p => p.y < h / 2);       // eyes belong on the TOP third line
+    if (Math.abs(vx) > 45) {                           // moving → leave lead room in front
+      const wantX = vx > 0 ? w / 3 : 2 * w / 3;        // moving right → subject left, space right
+      const f = pts.filter(p => Math.abs(p.x - wantX) < 1);
+      if (f.length) pts = f;
+    }
+    return pts;
+  }
+
   // ---------- Drawing ----------
   function powerPoints(w, h) {
     return [
@@ -561,12 +591,19 @@
 
   function doFlash() { flash.style.opacity = '0.9'; setTimeout(() => flash.style.opacity = '0', 120); }
 
-  function composeThirds(src, cx, cy) {
+  function composeThirds(src, cx, cy, eye, vx) {
     const W = src.width, H = src.height, z = 1.25;
     const cw = Math.round(W / z), ch = Math.round(H / z);
     const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+    let cands = [[1/3, 1/3], [2/3, 1/3], [1/3, 2/3], [2/3, 2/3]];
+    if (eye) cands = cands.filter(c => c[1] < 0.5);          // eyes on top intersections
+    if (Math.abs(vx || 0) > 45) {                            // lead room in front of motion
+      const wantFx = vx > 0 ? 1/3 : 2/3;
+      const f = cands.filter(c => c[0] === wantFx);
+      if (f.length) cands = f;
+    }
     let best = null;
-    for (const [fx, fy] of [[1/3, 1/3], [2/3, 1/3], [1/3, 2/3], [2/3, 2/3]]) {
+    for (const [fx, fy] of cands) {
       const x0 = clamp(cx - fx * cw, 0, W - cw);
       const y0 = clamp(cy - fy * ch, 0, H - ch);
       const score = Math.hypot((cx - x0) / cw - fx, (cy - y0) / ch - fy);
@@ -586,7 +623,7 @@
     c.width = iw; c.height = ih;
     c.getContext('2d').drawImage(video, v.x0, v.y0, iw, ih, 0, 0, iw, ih);
     if (lastSubject && Date.now() - lastSubject.t < 1200) {
-      c = composeThirds(c, lastSubject.cxImg, lastSubject.cyImg);
+      c = composeThirds(c, lastSubject.cxImg, lastSubject.cyImg, lastSubject.eye, lastSubject.vx);
     }
     doFlash(); shutterSound(); buzz([40, 60, 40]);
     const blob = await new Promise(r => c.toBlob(r, 'image/jpeg', 0.92));
@@ -630,20 +667,30 @@
           const bx = (vbx - x0) * scale, by = (vby - y0) * scale;
           const bw = vbw * scale, bh = vbh * scale;
           const cx = bx + bw / 2, cy = by + bh / 2;
-          lastSubject = { cxImg: (vbx + vbw / 2) - x0, cyImg: (vby + vbh / 2) - y0, t: Date.now() };
+          // Anchor: eyes for people/animals, center for objects
+          const anc = anchorFor(subject);
+          const ax = (anc.x - x0) * scale, ay = (anc.y - y0) * scale;
+          const vxMotion = trackMotion(ax);
+          lastSubject = { cxImg: anc.x - x0, cyImg: anc.y - y0, eye: anc.eye, vx: vxMotion, t: Date.now() };
 
-          const pts = powerPoints(sw, sh);
+          const pts = candidatePoints(sw, sh, anc.eye, vxMotion);
           let nearest = pts[0], nd = Infinity;
-          for (const p of pts) { const d = Math.hypot(cx - p.x, cy - p.y); if (d < nd) { nd = d; nearest = p; } }
+          for (const p of pts) { const d = Math.hypot(ax - p.x, ay - p.y); if (d < nd) { nd = d; nearest = p; } }
           const aligned = nd <= ALIGN_RADIUS * Math.hypot(sw, sh);
 
           const boxColor = aligned ? '#3fb950' : (selected ? '#a371f7' : '#2f81f7');
           ctx.strokeStyle = boxColor; ctx.lineWidth = 3;
           ctx.strokeRect(bx, by, bw, bh);
           ctx.fillStyle = boxColor;
-          ctx.beginPath(); ctx.arc(cx, cy, 6, 0, Math.PI * 2); ctx.fill();
+          // Anchor marker: crosshair on the eyes (or center for objects)
+          ctx.beginPath(); ctx.arc(ax, ay, 6, 0, Math.PI * 2); ctx.fill();
+          if (anc.eye) {
+            ctx.strokeStyle = boxColor; ctx.lineWidth = 2;
+            ctx.beginPath(); ctx.moveTo(ax - 14, ay); ctx.lineTo(ax + 14, ay);
+            ctx.moveTo(ax, ay - 14); ctx.lineTo(ax, ay + 14); ctx.stroke();
+          }
           ctx.font = 'bold 15px sans-serif';
-          const tag = (selected ? '📌 ' : '') + subject.class;
+          const tag = (selected ? '📌 ' : '') + subject.class + (anc.eye ? ' 👁' : '');
           ctx.fillText(tag, bx + 4, Math.max(64, by - 8));
 
           if (aligned) {
@@ -655,10 +702,10 @@
             else if (autoCapture && !countingDown && stableCount >= STABLE_FRAMES) {
               setStatus(`Capturing ${subject.class}!`, '#3fb950');
               runCountdownAndCapture(subject.class);
-            } else setStatus(`Locked on ${subject.class} — hold steady`, '#3fb950');
+            } else setStatus(`${anc.eye ? 'Eyes locked on the third' : `Locked on ${subject.class}`} — hold steady`, '#3fb950');
           } else {
             stableCount = 0;
-            drawArrow(cx, cy, nearest.x, nearest.y);
+            drawArrow(ax, ay, nearest.x, nearest.y);
             ctx.beginPath(); ctx.arc(nearest.x, nearest.y, 14, 0, Math.PI * 2);
             ctx.strokeStyle = '#ffd33d'; ctx.lineWidth = 3; ctx.stroke();
             setStatus(`${selected ? 'Tracking' : 'Found'} ${subject.class} — follow the arrow`, selected ? '#a371f7' : '#2f81f7');
