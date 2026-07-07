@@ -2,9 +2,9 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no">
 <title>Thirds Rule Camera</title>
-<meta name="theme-color" content="#0d1117">
+<meta name="theme-color" content="#000000">
 <link rel="manifest" href="manifest.json">
 <link rel="apple-touch-icon" href="icon-192.png">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -14,97 +14,123 @@
 <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.17.0/dist/tf.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/coco-ssd@2.2.3/dist/coco-ssd.min.js"></script>
 <style>
-  :root {
-    --bg: #0d1117; --panel: #161b22; --accent: #2f81f7; --good: #3fb950;
-    --warn: #d29922; --text: #e6edf3; --dim: #8b949e;
-  }
   * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
-  body {
-    background: var(--bg); color: var(--text);
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-    display: flex; flex-direction: column; align-items: center;
-    min-height: 100vh; padding: 12px; padding-top: calc(12px + env(safe-area-inset-top)); gap: 10px;
-  }
-  h1 { font-size: 1.1rem; font-weight: 600; }
-  h1 span { color: var(--accent); }
-  #stage {
-    position: relative; width: min(960px, 100%);
-    border-radius: 12px; overflow: hidden; background: #000;
-    box-shadow: 0 8px 30px rgba(0,0,0,.5);
-  }
-  video { width: 100%; display: block; }
+  html, body { height: 100%; overflow: hidden; background: #000;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+
+  #stage { position: fixed; inset: 0; background: #000; }
+  video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
   #overlay { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
-  #flash {
-    position: absolute; inset: 0; background: #fff; opacity: 0;
-    pointer-events: none; transition: opacity .35s ease;
-  }
-  #status {
-    display: flex; align-items: center; gap: 10px;
-    background: var(--panel); border-radius: 10px; padding: 10px 14px;
-    width: min(960px, 100%); font-size: .9rem;
-  }
-  #statusDot { width: 10px; height: 10px; border-radius: 50%; background: var(--dim); flex-shrink: 0; }
-  .controls { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; }
-  button {
-    background: var(--panel); color: var(--text); border: 1px solid #30363d;
-    padding: 10px 16px; border-radius: 8px; font-size: .9rem; cursor: pointer;
-  }
-  button:hover { border-color: var(--accent); }
-  button.primary { background: var(--accent); border-color: var(--accent); font-weight: 600; }
-  button.small { padding: 5px 10px; font-size: .78rem; border-radius: 6px; }
-  #gallery {
-    display: flex; gap: 10px; flex-wrap: wrap; justify-content: center;
-    width: min(960px, 100%); padding-bottom: 20px;
-  }
-  #gallery figure {
-    background: var(--panel); border-radius: 8px; padding: 6px;
-    display: flex; flex-direction: column; gap: 6px; align-items: center;
-  }
-  #gallery img { width: 160px; border-radius: 6px; display: block; }
-  #gallery .row { display: flex; gap: 6px; }
-  #countdown {
-    position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
-    font-size: 5rem; font-weight: 700; color: #fff; text-shadow: 0 2px 20px rgba(0,0,0,.8);
-    pointer-events: none; opacity: 0;
-  }
+  #flash { position: absolute; inset: 0; background: #fff; opacity: 0; pointer-events: none;
+    transition: opacity .35s ease; }
+  #countdown { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+    font-size: 6rem; font-weight: 700; color: #fff; text-shadow: 0 2px 20px rgba(0,0,0,.8);
+    pointer-events: none; opacity: 0; }
+
+  /* Top bar */
+  #topbar { position: absolute; left: 0; right: 0; top: 0;
+    padding: calc(8px + env(safe-area-inset-top)) 10px 8px;
+    display: flex; align-items: center; gap: 8px; z-index: 5; }
+  #status { flex: 1; display: flex; align-items: center; gap: 8px;
+    background: rgba(0,0,0,.55); backdrop-filter: blur(6px);
+    border-radius: 999px; padding: 7px 12px; color: #fff; font-size: .8rem;
+    min-width: 0; }
+  #statusText { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  #statusDot { width: 9px; height: 9px; border-radius: 50%; background: #8b949e; flex-shrink: 0; }
+  .chip { background: rgba(0,0,0,.55); backdrop-filter: blur(6px); color: #fff;
+    border: none; border-radius: 999px; padding: 7px 11px; font-size: .8rem; }
   #installBtn { display: none; }
+  #lensSel { max-width: 110px; -webkit-appearance: none; appearance: none; }
+
+  /* Zoom */
+  #zoomWrap { position: absolute; right: 10px; top: 50%; transform: translateY(-50%);
+    z-index: 5; display: none; flex-direction: column; align-items: center; gap: 6px;
+    background: rgba(0,0,0,.45); border-radius: 999px; padding: 12px 8px; }
+  #zoomWrap label { color: #fff; font-size: .7rem; }
+  #zoom { writing-mode: vertical-lr; direction: rtl; height: 130px; width: 24px; }
+
+  /* Bottom controls */
+  #controls { position: absolute; left: 0; right: 0; bottom: 0; z-index: 5;
+    padding: 10px 18px calc(14px + env(safe-area-inset-bottom));
+    display: flex; align-items: center; justify-content: space-between;
+    background: linear-gradient(transparent, rgba(0,0,0,.55)); }
+  .side { width: 74px; display: flex; flex-direction: column; align-items: center; gap: 8px; }
+  #autoBtn { border: none; border-radius: 999px; padding: 8px 12px; font-size: .75rem;
+    font-weight: 700; color: #fff; background: #3fb950; }
+  #autoBtn.off { background: rgba(255,255,255,.22); }
+  #flipBtn { border: none; background: rgba(255,255,255,.22); color: #fff;
+    width: 46px; height: 46px; border-radius: 50%; font-size: 1.3rem; }
+  #shutter { width: 74px; height: 74px; border-radius: 50%; border: 5px solid #fff;
+    background: rgba(255,255,255,.25); }
+  #shutter:active { background: #fff; }
+  #galThumb { width: 46px; height: 46px; border-radius: 10px; border: 2px solid rgba(255,255,255,.6);
+    background: rgba(255,255,255,.12) center/cover no-repeat; padding: 0; }
+
+  /* Gallery sheet */
+  #sheet { position: absolute; left: 0; right: 0; bottom: 0; top: 22%;
+    background: #14181f; border-radius: 18px 18px 0 0; z-index: 10;
+    transform: translateY(105%); transition: transform .25s ease;
+    display: flex; flex-direction: column; }
+  #sheet.open { transform: translateY(0); }
+  #sheetHead { display: flex; align-items: center; justify-content: space-between;
+    padding: 14px 16px; color: #e6edf3; font-weight: 600; }
+  #closeSheet { background: rgba(255,255,255,.15); color: #fff; border: none;
+    border-radius: 50%; width: 32px; height: 32px; font-size: 1rem; }
+  #gallery { overflow-y: auto; display: grid; gap: 10px; padding: 0 12px calc(16px + env(safe-area-inset-bottom));
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); }
+  #gallery figure { background: #1d232c; border-radius: 10px; padding: 6px;
+    display: flex; flex-direction: column; gap: 6px; }
+  #gallery img { width: 100%; border-radius: 8px; display: block; }
+  #gallery .row { display: flex; gap: 6px; justify-content: center; }
+  #gallery .row button { background: rgba(255,255,255,.12); color: #fff; border: none;
+    border-radius: 7px; padding: 6px 10px; font-size: .8rem; }
 </style>
 </head>
 <body>
-<h1>📷 Thirds Rule Camera <span>· AI auto-capture</span></h1>
-
 <div id="stage">
   <video id="video" autoplay playsinline muted></video>
   <canvas id="overlay"></canvas>
   <div id="countdown"></div>
   <div id="flash"></div>
+
+  <div id="topbar">
+    <div id="status"><div id="statusDot"></div><div id="statusText">Loading…</div></div>
+    <select id="lensSel" class="chip"></select>
+    <button id="installBtn" class="chip">⬇ Install</button>
+  </div>
+
+  <div id="zoomWrap">
+    <label id="zoomVal">1x</label>
+    <input id="zoom" type="range" min="1" max="1" step="0.1" value="1">
+  </div>
+
+  <div id="controls">
+    <div class="side">
+      <button id="autoBtn">AUTO ON</button>
+      <button id="galThumb" title="Gallery"></button>
+    </div>
+    <button id="shutter" title="Take photo"></button>
+    <div class="side">
+      <button id="flipBtn" title="Flip camera">🔄</button>
+    </div>
+  </div>
+
+  <div id="sheet">
+    <div id="sheetHead"><span>Photos</span><button id="closeSheet">✕</button></div>
+    <div id="gallery"></div>
+  </div>
 </div>
-
-<div id="status"><div id="statusDot"></div><div id="statusText">Loading AI model…</div></div>
-
-<div class="controls">
-  <button id="autoBtn" class="primary">Auto-capture: ON</button>
-  <button id="shutterBtn">Manual shutter</button>
-  <button id="flipBtn">Flip camera</button>
-  <button id="installBtn">⬇ Install app</button>
-</div>
-
-<div id="gallery"></div>
 
 <script>
 (async () => {
-  const video = document.getElementById('video');
-  const overlay = document.getElementById('overlay');
-  const ctx = overlay.getContext('2d');
-  const flash = document.getElementById('flash');
-  const countdownEl = document.getElementById('countdown');
-  const statusDot = document.getElementById('statusDot');
-  const statusText = document.getElementById('statusText');
-  const gallery = document.getElementById('gallery');
-  const autoBtn = document.getElementById('autoBtn');
-  const shutterBtn = document.getElementById('shutterBtn');
-  const flipBtn = document.getElementById('flipBtn');
-  const installBtn = document.getElementById('installBtn');
+  const $ = id => document.getElementById(id);
+  const video = $('video'), overlay = $('overlay'), ctx = overlay.getContext('2d');
+  const flash = $('flash'), countdownEl = $('countdown');
+  const statusDot = $('statusDot'), statusText = $('statusText');
+  const gallery = $('gallery'), sheet = $('sheet'), galThumb = $('galThumb');
+  const autoBtn = $('autoBtn'), shutterBtn = $('shutter'), flipBtn = $('flipBtn');
+  const installBtn = $('installBtn'), lensSel = $('lensSel');
+  const zoomWrap = $('zoomWrap'), zoomSlider = $('zoom'), zoomVal = $('zoomVal');
 
   // --- Tunables ---
   const ALIGN_RADIUS = 0.07;
@@ -115,32 +141,25 @@
 
   let autoCapture = true;
   let facingMode = 'environment';
-  let model = null;
-  let stream = null;
-  let stableCount = 0;
-  let lastCapture = 0;
-  let countingDown = false;
-  let lastSubject = null; // {cx, cy, t} updated each frame a subject is seen
+  let currentDeviceId = null;
+  let model = null, stream = null, track = null;
+  let stableCount = 0, lastCapture = 0, countingDown = false;
+  let lastSubject = null;   // {cxImg, cyImg, t} in visible-image coords
+  let view = null;          // current mapping {scale, x0, y0, sw, sh}
 
-  // ---------- PWA install ----------
-  if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('sw.js').catch(() => {});
-  }
+  // ---------- PWA ----------
+  if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
   let deferredPrompt = null;
-  window.addEventListener('beforeinstallprompt', (e) => {
-    e.preventDefault();
-    deferredPrompt = e;
-    installBtn.style.display = 'inline-block';
+  window.addEventListener('beforeinstallprompt', e => {
+    e.preventDefault(); deferredPrompt = e; installBtn.style.display = 'inline-block';
   });
   installBtn.onclick = async () => {
     if (!deferredPrompt) return;
-    deferredPrompt.prompt();
-    await deferredPrompt.userChoice;
-    deferredPrompt = null;
-    installBtn.style.display = 'none';
+    deferredPrompt.prompt(); await deferredPrompt.userChoice;
+    deferredPrompt = null; installBtn.style.display = 'none';
   };
 
-  // ---------- Photo storage (IndexedDB) ----------
+  // ---------- IndexedDB ----------
   function openDB() {
     return new Promise((res, rej) => {
       const req = indexedDB.open('thirds-cam', 1);
@@ -149,102 +168,123 @@
       req.onerror = () => rej(req.error);
     });
   }
-  async function dbPut(photo) {
-    const db = await openDB();
-    return new Promise((res, rej) => {
-      const tx = db.transaction('photos', 'readwrite');
-      tx.objectStore('photos').put(photo);
-      tx.oncomplete = res; tx.onerror = () => rej(tx.error);
-    });
-  }
-  async function dbAll() {
-    const db = await openDB();
-    return new Promise((res, rej) => {
-      const req = db.transaction('photos').objectStore('photos').getAll();
-      req.onsuccess = () => res(req.result.sort((a, b) => b.id - a.id));
-      req.onerror = () => rej(req.error);
-    });
-  }
-  async function dbDelete(id) {
-    const db = await openDB();
-    return new Promise((res, rej) => {
-      const tx = db.transaction('photos', 'readwrite');
-      tx.objectStore('photos').delete(id);
-      tx.oncomplete = res; tx.onerror = () => rej(tx.error);
-    });
-  }
+  const dbPut = async p => { const db = await openDB(); return new Promise((res, rej) => {
+    const tx = db.transaction('photos', 'readwrite'); tx.objectStore('photos').put(p);
+    tx.oncomplete = res; tx.onerror = () => rej(tx.error); }); };
+  const dbAll = async () => { const db = await openDB(); return new Promise((res, rej) => {
+    const rq = db.transaction('photos').objectStore('photos').getAll();
+    rq.onsuccess = () => res(rq.result.sort((a, b) => b.id - a.id));
+    rq.onerror = () => rej(rq.error); }); };
+  const dbDelete = async id => { const db = await openDB(); return new Promise((res, rej) => {
+    const tx = db.transaction('photos', 'readwrite'); tx.objectStore('photos').delete(id);
+    tx.oncomplete = res; tx.onerror = () => rej(tx.error); }); };
 
-  function addToGallery(photo) {
+  function addToGallery(photo, prepend = true) {
     const fig = document.createElement('figure');
     const img = document.createElement('img');
-    img.src = URL.createObjectURL(photo.blob);
-    const row = document.createElement('div');
-    row.className = 'row';
-
+    const url = URL.createObjectURL(photo.blob);
+    img.src = url;
+    const row = document.createElement('div'); row.className = 'row';
     const name = `thirds-${photo.id}.jpg`;
 
-    // Save to phone: Web Share (→ Save Image / Photos) when available
-    let canShareFiles = false;
-    try {
-      canShareFiles = navigator.canShare && navigator.canShare({ files: [new File([photo.blob], name, { type: 'image/jpeg' })] });
-    } catch (e) {}
-    if (canShareFiles) {
-      const shareBtn = document.createElement('button');
-      shareBtn.className = 'small'; shareBtn.textContent = '💾 Save';
-      shareBtn.onclick = () => navigator.share({
-        files: [new File([photo.blob], name, { type: 'image/jpeg' })]
-      }).catch(() => {});
-      row.append(shareBtn);
+    let shareable = false;
+    try { shareable = navigator.canShare &&
+      navigator.canShare({ files: [new File([photo.blob], name, { type: 'image/jpeg' })] }); } catch (e) {}
+    if (shareable) {
+      const b = document.createElement('button'); b.textContent = '💾 Save';
+      b.onclick = () => navigator.share({ files: [new File([photo.blob], name, { type: 'image/jpeg' })] }).catch(() => {});
+      row.append(b);
     }
-
-    const dlBtn = document.createElement('button');
-    dlBtn.className = 'small'; dlBtn.textContent = '⬇';
-    dlBtn.onclick = () => {
-      const a = document.createElement('a');
-      a.href = img.src; a.download = name; a.click();
-    };
-    const delBtn = document.createElement('button');
-    delBtn.className = 'small'; delBtn.textContent = '🗑';
-    delBtn.onclick = async () => { await dbDelete(photo.id); fig.remove(); };
-
-    row.append(dlBtn, delBtn);
+    const dl = document.createElement('button'); dl.textContent = '⬇';
+    dl.onclick = () => { const a = document.createElement('a'); a.href = url; a.download = name; a.click(); };
+    const del = document.createElement('button'); del.textContent = '🗑';
+    del.onclick = async () => { await dbDelete(photo.id); fig.remove(); };
+    row.append(dl, del);
     fig.append(img, row);
-    gallery.prepend(fig);
+    prepend ? gallery.prepend(fig) : gallery.append(fig);
+    if (prepend) galThumb.style.backgroundImage = `url(${url})`;
   }
+  galThumb.onclick = () => sheet.classList.add('open');
+  $('closeSheet').onclick = () => sheet.classList.remove('open');
 
   // ---------- Camera ----------
-  function setStatus(text, color) {
-    statusText.textContent = text;
-    statusDot.style.background = color || 'var(--dim)';
-  }
+  function setStatus(t, c) { statusText.textContent = t; statusDot.style.background = c || '#8b949e'; }
 
-  function syncOverlay() {
-    if (video.videoWidth && (overlay.width !== video.videoWidth || overlay.height !== video.videoHeight)) {
-      overlay.width = video.videoWidth;
-      overlay.height = video.videoHeight;
+  async function listLenses() {
+    try {
+      const devs = (await navigator.mediaDevices.enumerateDevices()).filter(d => d.kind === 'videoinput');
+      lensSel.innerHTML = '';
+      devs.forEach((d, i) => {
+        const o = document.createElement('option');
+        o.value = d.deviceId;
+        o.textContent = d.label ? d.label.replace(/ Camera.*$/i, '').slice(0, 22) : `Camera ${i + 1}`;
+        lensSel.append(o);
+      });
+      lensSel.style.display = devs.length > 1 ? 'block' : 'none';
+      if (currentDeviceId) lensSel.value = currentDeviceId;
+    } catch (e) {}
+  }
+  lensSel.onchange = () => { currentDeviceId = lensSel.value; startCamera(); };
+
+  function setupZoom() {
+    zoomWrap.style.display = 'none';
+    if (!track || !track.getCapabilities) return;
+    const cap = track.getCapabilities();
+    if (cap.zoom && cap.zoom.max > cap.zoom.min) {
+      zoomSlider.min = cap.zoom.min; zoomSlider.max = Math.min(cap.zoom.max, 10);
+      zoomSlider.step = cap.zoom.step || 0.1;
+      const cur = track.getSettings().zoom || cap.zoom.min;
+      zoomSlider.value = cur; zoomVal.textContent = (+cur).toFixed(1) + 'x';
+      zoomWrap.style.display = 'flex';
     }
   }
+  zoomSlider.oninput = () => {
+    const v = +zoomSlider.value;
+    zoomVal.textContent = v.toFixed(1) + 'x';
+    if (track) track.applyConstraints({ advanced: [{ zoom: v }] }).catch(() => {});
+  };
 
   async function startCamera() {
     if (stream) stream.getTracks().forEach(t => t.stop());
+    const base = currentDeviceId
+      ? { deviceId: { exact: currentDeviceId } }
+      : { facingMode };
     try {
       stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode, width: { ideal: 1920 }, height: { ideal: 1920 } },
-        audio: false
+        video: { ...base, width: { ideal: 1920 }, height: { ideal: 1920 } }, audio: false
       });
+      track = stream.getVideoTracks()[0];
+      currentDeviceId = track.getSettings().deviceId || currentDeviceId;
       video.srcObject = stream;
       await new Promise(r => video.onloadedmetadata = r);
       await video.play().catch(() => {});
-      syncOverlay();
+      setupZoom();
+      listLenses();
     } catch (e) {
       setStatus('Camera unavailable: ' + e.message, '#f85149');
       throw e;
     }
   }
-  // Re-sync when the phone rotates or the stream changes shape
-  window.addEventListener('resize', () => setTimeout(syncOverlay, 300));
-  window.addEventListener('orientationchange', () => setTimeout(syncOverlay, 500));
-  video.addEventListener('resize', syncOverlay);
+  flipBtn.onclick = async () => {
+    facingMode = facingMode === 'environment' ? 'user' : 'environment';
+    currentDeviceId = null;
+    await startCamera();
+  };
+
+  // Map video pixels → displayed (cover) canvas pixels
+  function computeView() {
+    const sw = stage.clientWidth, sh = stage.clientHeight;
+    const vw = video.videoWidth, vh = video.videoHeight;
+    if (!vw || !vh) return null;
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    if (overlay.width !== Math.round(sw * dpr) || overlay.height !== Math.round(sh * dpr)) {
+      overlay.width = Math.round(sw * dpr); overlay.height = Math.round(sh * dpr);
+    }
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    const scale = Math.max(sw / vw, sh / vh);
+    return { sw, sh, scale, x0: (vw - sw / scale) / 2, y0: (vh - sh / scale) / 2 };
+  }
+  const stage = $('stage');
 
   function powerPoints(w, h) {
     return [
@@ -254,9 +294,7 @@
   }
 
   function drawGrid(w, h) {
-    ctx.strokeStyle = 'rgba(255,255,255,0.45)';
-    ctx.lineWidth = 1.5;
-    ctx.setLineDash([8, 8]);
+    ctx.strokeStyle = 'rgba(255,255,255,0.45)'; ctx.lineWidth = 1.5; ctx.setLineDash([8, 8]);
     [w / 3, 2 * w / 3].forEach(x => { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, h); ctx.stroke(); });
     [h / 3, 2 * h / 3].forEach(y => { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(w, y); ctx.stroke(); });
     ctx.setLineDash([]);
@@ -266,25 +304,21 @@
     });
   }
 
-  function pickSubject(predictions) {
-    let best = null, bestVal = 0;
-    for (const p of predictions) {
+  function pickSubject(preds) {
+    let best = null, bv = 0;
+    for (const p of preds) {
       if (p.score < MIN_SCORE) continue;
-      const val = p.bbox[2] * p.bbox[3] * p.score;
-      if (val > bestVal) { bestVal = val; best = p; }
+      const v = p.bbox[2] * p.bbox[3] * p.score;
+      if (v > bv) { bv = v; best = p; }
     }
     return best;
   }
 
-  function doFlash() {
-    flash.style.opacity = '0.9';
-    setTimeout(() => flash.style.opacity = '0', 120);
-  }
+  function doFlash() { flash.style.opacity = '0.9'; setTimeout(() => flash.style.opacity = '0', 120); }
 
-  // Crop the frame so the subject lands EXACTLY on a thirds power point
+  // Crop so the subject lands EXACTLY on a thirds power point
   function composeThirds(src, cx, cy) {
-    const W = src.width, H = src.height;
-    const z = 1.25;                       // zoom-in factor for recomposition room
+    const W = src.width, H = src.height, z = 1.25;
     const cw = Math.round(W / z), ch = Math.round(H / z);
     const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
     let best = null;
@@ -301,17 +335,20 @@
   }
 
   async function capture(label) {
+    const v = view || computeView();
+    if (!v) return;
+    // WYSIWYG: capture exactly what's visible on screen
+    const iw = Math.round(v.sw / v.scale), ih = Math.round(v.sh / v.scale);
     let c = document.createElement('canvas');
-    c.width = video.videoWidth; c.height = video.videoHeight;
-    c.getContext('2d').drawImage(video, 0, 0);
-    // Recompose so the subject sits precisely on a thirds intersection
+    c.width = iw; c.height = ih;
+    c.getContext('2d').drawImage(video, v.x0, v.y0, iw, ih, 0, 0, iw, ih);
     if (lastSubject && Date.now() - lastSubject.t < 1200) {
-      c = composeThirds(c, lastSubject.cx, lastSubject.cy);
+      c = composeThirds(c, lastSubject.cxImg, lastSubject.cyImg);
     }
     doFlash();
     const blob = await new Promise(r => c.toBlob(r, 'image/jpeg', 0.92));
     const photo = { id: Date.now(), blob, label: label || '' };
-    try { await dbPut(photo); } catch (e) { console.warn('save failed', e); }
+    try { await dbPut(photo); } catch (e) {}
     addToGallery(photo);
     lastCapture = Date.now();
     stableCount = 0;
@@ -320,8 +357,7 @@
   async function runCountdownAndCapture(label) {
     countingDown = true;
     for (let n = COUNTDOWN_FROM; n >= 1; n--) {
-      countdownEl.textContent = n;
-      countdownEl.style.opacity = '1';
+      countdownEl.textContent = n; countdownEl.style.opacity = '1';
       await new Promise(r => setTimeout(r, 500));
     }
     countdownEl.style.opacity = '0';
@@ -330,72 +366,66 @@
   }
 
   function guidance(dx, dy) {
-    const dirs = [];
-    if (Math.abs(dx) > 4) dirs.push(dx > 0 ? '→ right' : '← left');
-    if (Math.abs(dy) > 4) dirs.push(dy > 0 ? '↓ down' : '↑ up');
-    return dirs.length ? 'Move subject ' + dirs.join(' and ') : 'Hold still…';
+    const d = [];
+    if (Math.abs(dx) > 4) d.push(dx > 0 ? '→' : '←');
+    if (Math.abs(dy) > 4) d.push(dy > 0 ? '↓' : '↑');
+    return d.length ? 'Move ' + d.join(' ') : 'Hold still…';
   }
 
   async function loop() {
     if (video.readyState >= 2 && model && video.videoWidth) {
-      syncOverlay();
-      const w = overlay.width, h = overlay.height;
-      ctx.clearRect(0, 0, w, h);
-      drawGrid(w, h);
+      view = computeView();
+      if (view) {
+        const { sw, sh, scale, x0, y0 } = view;
+        ctx.clearRect(0, 0, sw, sh);
+        drawGrid(sw, sh);
 
-      let predictions = [];
-      try { predictions = await model.detect(video); } catch (e) {}
-      const subject = pickSubject(predictions);
+        let preds = [];
+        try { preds = await model.detect(video); } catch (e) {}
+        const subject = pickSubject(preds);
 
-      if (subject) {
-        const [bx, by, bw, bh] = subject.bbox;
-        const cx = bx + bw / 2, cy = by + bh / 2;
-        lastSubject = { cx, cy, t: Date.now() };
+        if (subject) {
+          const [vbx, vby, vbw, vbh] = subject.bbox;
+          // map to screen coords
+          const bx = (vbx - x0) * scale, by = (vby - y0) * scale;
+          const bw = vbw * scale, bh = vbh * scale;
+          const cx = bx + bw / 2, cy = by + bh / 2;
+          lastSubject = { cxImg: (vbx + vbw / 2) - x0, cyImg: (vby + vbh / 2) - y0, t: Date.now() };
 
-        const pts = powerPoints(w, h);
-        let nearest = pts[0], nd = Infinity;
-        for (const p of pts) {
-          const d = Math.hypot(cx - p.x, cy - p.y);
-          if (d < nd) { nd = d; nearest = p; }
-        }
-        const threshold = ALIGN_RADIUS * Math.hypot(w, h);
-        const aligned = nd <= threshold;
+          const pts = powerPoints(sw, sh);
+          let nearest = pts[0], nd = Infinity;
+          for (const p of pts) { const d = Math.hypot(cx - p.x, cy - p.y); if (d < nd) { nd = d; nearest = p; } }
+          const aligned = nd <= ALIGN_RADIUS * Math.hypot(sw, sh);
 
-        ctx.strokeStyle = aligned ? '#3fb950' : '#2f81f7';
-        ctx.lineWidth = 3;
-        ctx.strokeRect(bx, by, bw, bh);
-        ctx.fillStyle = ctx.strokeStyle;
-        ctx.beginPath(); ctx.arc(cx, cy, 6, 0, Math.PI * 2); ctx.fill();
-        ctx.font = `${Math.max(14, w / 50)}px sans-serif`;
-        ctx.fillText(`${subject.class} ${(subject.score * 100).toFixed(0)}%`, bx + 4, Math.max(16, by - 8));
+          ctx.strokeStyle = aligned ? '#3fb950' : '#2f81f7'; ctx.lineWidth = 3;
+          ctx.strokeRect(bx, by, bw, bh);
+          ctx.fillStyle = ctx.strokeStyle;
+          ctx.beginPath(); ctx.arc(cx, cy, 6, 0, Math.PI * 2); ctx.fill();
+          ctx.font = '15px sans-serif';
+          ctx.fillText(`${subject.class} ${(subject.score * 100).toFixed(0)}%`, bx + 4, Math.max(60, by - 8));
 
-        ctx.setLineDash([4, 6]);
-        ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(nearest.x, nearest.y); ctx.stroke();
-        ctx.setLineDash([]);
+          ctx.setLineDash([4, 6]);
+          ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(nearest.x, nearest.y); ctx.stroke();
+          ctx.setLineDash([]);
+          ctx.beginPath(); ctx.arc(nearest.x, nearest.y, 14, 0, Math.PI * 2);
+          ctx.strokeStyle = aligned ? '#3fb950' : '#d29922'; ctx.lineWidth = 3; ctx.stroke();
 
-        ctx.beginPath(); ctx.arc(nearest.x, nearest.y, 14, 0, Math.PI * 2);
-        ctx.strokeStyle = aligned ? '#3fb950' : '#d29922';
-        ctx.lineWidth = 3; ctx.stroke();
-
-        const coolingDown = Date.now() - lastCapture < COOLDOWN_MS;
-
-        if (aligned) {
-          stableCount++;
-          if (coolingDown) {
-            setStatus(`${subject.class} aligned — cooling down`, '#d29922');
-          } else if (autoCapture && !countingDown && stableCount >= STABLE_FRAMES) {
-            setStatus(`Capturing ${subject.class}!`, '#3fb950');
-            runCountdownAndCapture(subject.class);
+          const cooling = Date.now() - lastCapture < COOLDOWN_MS;
+          if (aligned) {
+            stableCount++;
+            if (cooling) setStatus(`${subject.class} aligned — cooling down`, '#d29922');
+            else if (autoCapture && !countingDown && stableCount >= STABLE_FRAMES) {
+              setStatus(`Capturing ${subject.class}!`, '#3fb950');
+              runCountdownAndCapture(subject.class);
+            } else setStatus(`${subject.class} — hold still (${Math.min(stableCount, STABLE_FRAMES)}/${STABLE_FRAMES})`, '#3fb950');
           } else {
-            setStatus(`${subject.class} on power point — hold still (${Math.min(stableCount, STABLE_FRAMES)}/${STABLE_FRAMES})`, '#3fb950');
+            stableCount = 0;
+            setStatus(`${subject.class} — ${guidance(nearest.x - cx, nearest.y - cy)}`, '#2f81f7');
           }
         } else {
           stableCount = 0;
-          setStatus(`${subject.class} detected — ${guidance(nearest.x - cx, nearest.y - cy)}`, '#2f81f7');
+          setStatus('Looking for a subject…');
         }
-      } else {
-        stableCount = 0;
-        setStatus('Looking for a subject…', 'var(--dim)');
       }
     }
     requestAnimationFrame(loop);
@@ -404,29 +434,22 @@
   // --- Controls ---
   autoBtn.onclick = () => {
     autoCapture = !autoCapture;
-    autoBtn.textContent = `Auto-capture: ${autoCapture ? 'ON' : 'OFF'}`;
-    autoBtn.classList.toggle('primary', autoCapture);
+    autoBtn.textContent = autoCapture ? 'AUTO ON' : 'AUTO OFF';
+    autoBtn.classList.toggle('off', !autoCapture);
   };
   shutterBtn.onclick = () => capture('manual');
-  flipBtn.onclick = async () => {
-    facingMode = facingMode === 'environment' ? 'user' : 'environment';
-    await startCamera();
-  };
 
   // --- Boot ---
-  try {
-    (await dbAll()).forEach(addToGallery);
-  } catch (e) {}
+  try { (await dbAll()).forEach(p => addToGallery(p, false));
+        const first = gallery.querySelector('img'); if (first) galThumb.style.backgroundImage = `url(${first.src})`; } catch (e) {}
   try {
     setStatus('Requesting camera…');
     await startCamera();
-    setStatus('Loading AI model (first load may take a few seconds)…');
+    setStatus('Loading AI model…');
     model = await cocoSsd.load();
     setStatus('Ready — point at a subject', '#3fb950');
     loop();
-  } catch (e) {
-    console.error(e);
-  }
+  } catch (e) { console.error(e); }
 })();
 </script>
 </body>
